@@ -70,11 +70,19 @@ export class CommandHandler {
       case '/help':
         return this.buildHelpText(isAdmin);
       case '/whoami':
-        return this.buildWhoAmIText(context);
+        return isAdmin || context.message.fromMe
+          ? this.buildWhoAmIText(context)
+          : this.notAuthorized();
       case '/pause':
+        if (context.message.isGroup && !isAdmin) {
+          return this.notAuthorized();
+        }
         this.userStateService.pause(context.conversation.id);
         return 'AI replies paused for this conversation.';
       case '/resume':
+        if (context.message.isGroup && !isAdmin) {
+          return this.notAuthorized();
+        }
         this.userStateService.resume(context.conversation.id);
         return 'AI replies resumed for this conversation.';
       case '/status':
