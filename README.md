@@ -1,36 +1,66 @@
 # WhatsApp AI Agent
 
-## Overview
-The WhatsApp AI Agent is a smart chatbot designed to provide automated responses and engage users on the WhatsApp platform. This project aims to enhance user interactions with businesses through personalized assistance and efficient query handling.
+Self-hosted TypeScript messaging agent with:
+
+- WhatsApp message handling via `whatsapp-web.js`
+- Telegram signal ingestion via `node-telegram-bot-api`
+- AI auto-replies for WhatsApp via OpenAI-compatible chat completions
+- SQLite persistence via `better-sqlite3`
+- Optional HTTP health endpoints via `express`
 
 ## Features
-- **Automated Responses:** Quickly responds to user queries based on predefined scenarios.
-- **User Intent Recognition:** Uses AI to understand user questions and provide relevant answers.
-- **Rich Media Support:** Can send images, videos, and documents in response to user requests.
-- **Integration Capabilities:** Easily integrates with existing systems via APIs.
 
-## Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/ezekiel37/whatsapp-ai-agent.git
-   cd whatsapp-ai-agent
-   ```
-2. Install the necessary dependencies:
-   ```bash
-   npm install
-   ```
+- WhatsApp QR login with local session persistence
+- Telegram allowlist-based signal ingestion
+- Per-conversation memory and cooldown handling
+- Signal filtering and forwarding to WhatsApp
+- SQLite-backed users, conversations, messages, and signals
+- Structured logging with `pino`
 
-## Usage
-To run the bot, use the following command:
-```bash
-node index.js
+## Project Structure
+
+```text
+src/
+  clients/
+  handlers/
+  services/
+  db/
+  types/
+  utils/
+  api/
 ```
 
-## Contribution
-Contributions are welcome! Please fork this repository and create a pull request for any significant changes you'd like to propose.
+## Setup
 
-## License
-This project is licensed under the MIT License. See the LICENSE file for more information.
+1. Install dependencies:
 
-## Contact
-For any inquiries, please reach out to [ezekiel37](https://github.com/ezekiel37).
+```bash
+npm install
+```
+
+2. Copy the environment template:
+
+```bash
+cp .env.example .env
+```
+
+3. Fill in the required values in `.env`.
+
+4. Run in development:
+
+```bash
+npm run dev
+```
+
+5. Build and run:
+
+```bash
+npm run build
+npm start
+```
+
+## Notes
+
+- WhatsApp uses a self-hosted WhatsApp Web session, so the first run requires QR pairing.
+- Telegram is signal-ingestion only in v1 and does not send AI replies.
+- SQLite is intended for a single-node v1 deployment.
