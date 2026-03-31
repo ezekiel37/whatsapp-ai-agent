@@ -7,6 +7,7 @@ import { CooldownService } from '../services/cooldownService';
 import { MemoryService } from '../services/memoryService';
 import { SignalService, type WhatsAppSender } from '../services/signalService';
 import { UserStateService } from '../services/userStateService';
+import { WhatsAppAccessPolicy } from '../services/whatsAppAccessPolicy';
 import type { AppConfig } from '../types/app';
 import type { IncomingMessage } from '../types/messages';
 import { delay } from '../utils/delay';
@@ -27,6 +28,7 @@ export class MessageHandler {
     private readonly aiService: AIService,
     private readonly commandHandler: CommandHandler,
     private readonly signalService: SignalService,
+    private readonly whatsAppAccessPolicy: WhatsAppAccessPolicy,
     private readonly whatsappSender: WhatsAppSender,
     private readonly logger: Logger
   ) {}
@@ -88,8 +90,9 @@ export class MessageHandler {
       }
     }
 
-    if (message.isGroup && !this.config.whatsappReplyToGroups) {
-      this.logger.info({ chatId: message.chatId }, 'Skipping group AI reply');
+    const skipReason = this.whatsAppAccessPolicy.getSkipReason(message);
+    if (skipReason) {
+      this.logger.debug({ chatId: message.chatId, chatTitle: message.chatTitle }, skipReason);
       return;
     }
 

@@ -5,15 +5,18 @@ import type { AppConfig } from '../types/app';
 import type { IncomingMessage } from '../types/messages';
 import type { SignalInput, SignalRecord } from '../types/signals';
 import { formatTimestamp } from '../utils/time';
+import { OperatorTargetService } from './operatorTargetService';
 
 export interface WhatsAppSender {
   sendText(chatId: string, text: string): Promise<void>;
+  resolveTarget(target: string, fallbackChatId?: string): Promise<string | undefined>;
 }
 
 export class SignalService {
   constructor(
     private readonly config: AppConfig,
     private readonly signalsRepository: SignalsRepository,
+    private readonly operatorTargetService: OperatorTargetService,
     private readonly whatsappSender: WhatsAppSender,
     private readonly logger: Logger
   ) {}
@@ -54,25 +57,26 @@ export class SignalService {
       return { ...record, status: 'filtered', filterReason: reason };
     }
 
-    if (!this.config.signalForwardTarget) {
+    const forwardTarget = this.operatorTargetService.getSignalForwardTarget();
+    if (!forwardTarget) {
       const errorMessage = 'SIGNAL_FORWARD_TARGET is not configured';
       this.signalsRepository.updateStatus(record.id, 'failed', { lastError: errorMessage });
       return { ...record, status: 'failed', lastError: errorMessage };
     }
 
     try {
-      await this.forwardSignal(signal, this.config.signalForwardTarget);
+      await this.forwardSignal(signal, forwardTarget);
       this.signalsRepository.updateStatus(record.id, 'forwarded', {
-        forwardTarget: this.config.signalForwardTarget,
+        forwardTarget,
       });
       this.logger.info(
-        { signalId: record.id, target: this.config.signalForwardTarget },
+        { signalId: record.id, target: forwardTarget },
         'Signal forwarded'
       );
       return {
         ...record,
         status: 'forwarded',
-        forwardTarget: this.config.signalForwardTarget,
+        forwardTarget,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown forwarding error';
@@ -115,6 +119,11 @@ export class SignalService {
       `Time: ${formatTimestamp(signal.timestamp)}`,
     ].join('\n');
 
-    await this.whatsappSender.sendText(target, payload);
+    const resolvedTarget = await this.whatsappSender.resolveTarget(target);
+    if (!resolvedTarget) {
+      throw new Error(`Unable to resolve WhatsApp target: ${target}`);
+    }
+
+    await this.whatsappSender.sendText(resolvedTarget, payload);
   }
 }

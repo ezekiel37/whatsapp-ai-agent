@@ -53,11 +53,49 @@ export class WhatsAppClient {
       }
     });
 
+    this.client.on('message_create', async (message) => {
+      const body = (message.body ?? '').trim().toLowerCase();
+      if (!message.fromMe || body !== '/whoami') {
+        return;
+      }
+
+      try {
+        const normalized = await this.normalizeMessage(message);
+        await onMessage(normalized);
+      } catch (error) {
+        this.logger.error({ err: error }, 'Failed to process WhatsApp message');
+      }
+    });
+
     await this.client.initialize();
   }
 
   async sendText(chatId: string, text: string): Promise<void> {
     await this.client.sendMessage(chatId, text);
+  }
+
+  async resolveTarget(target: string, fallbackChatId?: string): Promise<string | undefined> {
+    const normalizedTarget = target.trim();
+
+    if (!normalizedTarget) {
+      return undefined;
+    }
+
+    if (normalizedTarget.toLowerCase() === 'here') {
+      return fallbackChatId;
+    }
+
+    if (normalizedTarget.includes('@')) {
+      return normalizedTarget;
+    }
+
+    const chats = await this.client.getChats();
+    const matchedChat = chats.find((chat) => {
+      const name = 'name' in chat && typeof chat.name === 'string' ? chat.name : '';
+      return name.trim().toLowerCase() === normalizedTarget.toLowerCase();
+    });
+
+    return matchedChat?.id._serialized;
   }
 
   isReady(): boolean {
@@ -77,6 +115,9 @@ export class WhatsAppClient {
       text: message.body ?? '',
       timestamp: message.timestamp || nowUnix(),
       isGroup: chat.isGroup,
+      fromMe: message.fromMe,
+      mentionedIds: message.mentionedIds ?? [],
+      currentUserId: this.client.info?.wid?._serialized,
       chatTitle: 'name' in chat ? chat.name : undefined,
     };
   }

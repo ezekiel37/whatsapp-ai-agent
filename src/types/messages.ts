@@ -9,6 +9,9 @@ export interface IncomingMessage {
   text: string;
   timestamp: number;
   isGroup: boolean;
+  fromMe: boolean;
+  mentionedIds: string[];
+  currentUserId?: string;
   chatTitle?: string;
   username?: string;
 }

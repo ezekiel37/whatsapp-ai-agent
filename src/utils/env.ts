@@ -68,6 +68,8 @@ export function loadConfig(): AppConfig {
     userCooldownMs: parseNumber(process.env.USER_COOLDOWN_MS, 5000, 'USER_COOLDOWN_MS'),
     memoryLimit: parseNumber(process.env.MEMORY_LIMIT, 12, 'MEMORY_LIMIT'),
     whatsappReplyToGroups: parseBoolean(process.env.WHATSAPP_REPLY_TO_GROUPS, false),
+    whatsappAllowedGroups: parseList(process.env.WHATSAPP_ALLOWED_GROUPS),
+    whatsappAdminSenders: parseList(process.env.WHATSAPP_ADMIN_SENDERS),
     whatsappSignalSenders: parseList(process.env.WHATSAPP_SIGNAL_SENDERS),
     whatsappSignalGroups: parseList(process.env.WHATSAPP_SIGNAL_GROUPS),
     signalKeywords: parseList(process.env.SIGNAL_KEYWORDS).map((keyword) => keyword.toLowerCase()),

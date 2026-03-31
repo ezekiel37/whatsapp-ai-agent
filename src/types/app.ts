@@ -16,6 +16,8 @@ export interface AppConfig {
   userCooldownMs: number;
   memoryLimit: number;
   whatsappReplyToGroups: boolean;
+  whatsappAllowedGroups: string[];
+  whatsappAdminSenders: string[];
   whatsappSignalSenders: string[];
   whatsappSignalGroups: string[];
   signalKeywords: string[];

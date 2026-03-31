@@ -4,15 +4,19 @@ import { WhatsAppClient } from './clients/whatsappClient';
 import { initializeDatabase } from './db';
 import { ConversationsRepository } from './db/repositories/conversationsRepository';
 import { MessagesRepository } from './db/repositories/messagesRepository';
+import { SettingsRepository } from './db/repositories/settingsRepository';
 import { SignalsRepository } from './db/repositories/signalsRepository';
 import { UsersRepository } from './db/repositories/usersRepository';
 import { CommandHandler } from './handlers/commandHandler';
 import { MessageHandler } from './handlers/messageHandler';
+import { AdminAccessService } from './services/adminAccessService';
 import { AIService } from './services/aiService';
 import { CooldownService } from './services/cooldownService';
 import { MemoryService } from './services/memoryService';
+import { OperatorTargetService } from './services/operatorTargetService';
 import { SignalService } from './services/signalService';
 import { UserStateService } from './services/userStateService';
+import { WhatsAppAccessPolicy } from './services/whatsAppAccessPolicy';
 import type { HealthStatus } from './types/app';
 import { loadConfig } from './utils/env';
 import { createLogger } from './utils/logger';
@@ -25,21 +29,39 @@ async function bootstrap(): Promise<void> {
   const usersRepository = new UsersRepository(database);
   const conversationsRepository = new ConversationsRepository(database);
   const messagesRepository = new MessagesRepository(database);
+  const settingsRepository = new SettingsRepository(database);
   const signalsRepository = new SignalsRepository(database);
 
+  const adminAccessService = new AdminAccessService(config);
+  const operatorTargetService = new OperatorTargetService(settingsRepository, config);
   const userStateService = new UserStateService(conversationsRepository);
   const memoryService = new MemoryService(messagesRepository, config.memoryLimit);
   const cooldownService = new CooldownService(config.userCooldownMs);
   const aiService = new AIService(config, logger);
+  const whatsAppAccessPolicy = new WhatsAppAccessPolicy(config);
   const whatsappClient = new WhatsAppClient(logger);
-  const signalService = new SignalService(config, signalsRepository, whatsappClient, logger);
-  const commandHandler = new CommandHandler(
-    userStateService,
-    messagesRepository,
+  const telegramClient = new TelegramClient(config.telegramBotToken, logger);
+  const signalService = new SignalService(
+    config,
+    signalsRepository,
+    operatorTargetService,
     whatsappClient,
     logger
   );
-  const messageHandler = new MessageHandler(
+  const runtimeHealthProvider = createHealthProvider(whatsappClient, telegramClient);
+
+  const wiredCommandHandler = new CommandHandler(
+    config,
+    adminAccessService,
+    operatorTargetService,
+    userStateService,
+    signalService,
+    messagesRepository,
+    whatsappClient,
+    runtimeHealthProvider,
+    logger
+  );
+  const wiredMessageHandler = new MessageHandler(
     config,
     usersRepository,
     messagesRepository,
@@ -47,19 +69,30 @@ async function bootstrap(): Promise<void> {
     memoryService,
     cooldownService,
     aiService,
-    commandHandler,
+    wiredCommandHandler,
     signalService,
+    whatsAppAccessPolicy,
     whatsappClient,
     logger
   );
-  const telegramClient = new TelegramClient(config.telegramBotToken, logger);
-
   await whatsappClient.start(async (message) => {
+    const shouldProcessReplyPath = whatsAppAccessPolicy.shouldProcessMessage(message);
+    const shouldProcessSignalPath = signalService.isAllowedWhatsAppSignalSource(message);
+
+    if (!shouldProcessReplyPath && !shouldProcessSignalPath) {
+      return;
+    }
+
     logger.info(
-      { chatId: message.chatId, senderId: message.senderId, isGroup: message.isGroup },
+      {
+        chatId: message.chatId,
+        chatTitle: message.chatTitle,
+        senderId: message.senderId,
+        isGroup: message.isGroup,
+      },
       'Incoming WhatsApp message'
     );
-    await messageHandler.handleWhatsAppMessage(message);
+    await wiredMessageHandler.handleWhatsAppMessage(message);
   });
 
   await telegramClient.start(async (signal) => {
@@ -73,7 +106,7 @@ async function bootstrap(): Promise<void> {
   });
 
   if (config.enableHttpServer) {
-    const server = createServer(signalService, createHealthProvider(whatsappClient, telegramClient), logger);
+    const server = createServer(signalService, runtimeHealthProvider, logger);
     server.listen(config.port, () => {
       logger.info({ port: config.port }, 'HTTP server listening');
     });
