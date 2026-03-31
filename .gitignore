@@ -1,0 +1,1 @@
+# Byte-compiled / optimized / DLL files\n__pycache__/\n*.py[cod]\n*$py.class\n\n# Distribution / packaging\n.Python\nbuild/\ndist/\n*.egg-info/\n*.egg\n\n# Virtual Environment\nvenv/\n.env\n
